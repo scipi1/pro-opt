@@ -13,7 +13,7 @@ from omegaconf import OmegaConf
 sys.path.append(dirname(dirname(abspath(__file__))))
 from proT.experiment_control import combination_sweep
 from proT.modules.utils import mk_fname, find_last_checkpoint
-from proT.old_.kfold_train import kfold_train
+#from proT.old_.kfold_train import kfold_train
 from proT.optuna_opt import OptunaStudy
 from proT.predict import predict_test_from_ckpt
 from proT.subroutines.sub_utils import save_output

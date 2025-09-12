@@ -17,7 +17,7 @@ from proT.forecaster import TransformerForecaster
 from proT.dataloader import ProcessDataModule
 from proT.predict import predict
 from proT.labels import *
-from proT.old_.config import load_config
+#from proT.old_.config import load_config
 
 
 # # enforce deterministic behavior

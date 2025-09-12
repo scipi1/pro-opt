@@ -1,9 +1,9 @@
-# ProChain Transformer
+# ProT - Process Transformer
 
 ## Overview
-ProChain Transformer is a specialized transformer-based model for time series forecasting, particularly designed for process data. It implements a modified transformer architecture based on the Spacetimeformer (Grigsby et al., 2023) with custom embedding layers, attention mechanisms, and encoder-decoder structures tailored for sequential process data analysis and prediction.
+ProT (Process Transformer) is a specialized transformer-based model for time series forecasting, particularly designed for process data analysis and prediction. It implements a modified transformer architecture with custom embedding layers, attention mechanisms, and encoder-decoder structures tailored for sequential process data.
 
-The model is capable of handling missing values in time series data and provides interpretable attention mechanisms to understand the relationships between different parts of the process sequence.
+The model is capable of handling missing values in time series data and provides interpretable attention mechanisms with entropy regularization to understand the relationships between different parts of the process sequence.
 
 ## Architecture
 
@@ -11,59 +11,69 @@ The model is capable of handling missing values in time series data and provides
 
 #### Embedding System
 - **ModularEmbedding**: Flexible embedding system that supports multiple embedding types:
-  - **Time2Vec**: Temporal embeddings based on the Time2Vec paper (Kazemi et al., 2019)
+  - **Time2Vec**: Temporal embeddings for time-based features
   - **SinusoidalPosition**: Positional embeddings as used in the original Transformer
-  - **nn_embedding**: Standard embedding lookup tables
-  - **identity_emb**: Identity embeddings for direct value representation
-  - **linear_emb**: Linear transformation embeddings
+  - **nn_embedding**: Standard embedding lookup tables for categorical variables
+  - **linear**: Linear transformation embeddings for continuous values
+  - **mask**: Mask embeddings for handling missing values
+  - **pass**: Identity embeddings for direct value representation
 
 #### Attention Mechanism
 - **ScaledDotAttention**: Implementation of the scaled dot-product attention
 - **AttentionLayer**: Wrapper for attention with projection layers
 - Support for causal masking and missing value handling
+- Entropy regularization for attention interpretability
 
 #### Encoder-Decoder Structure
 - **Encoder**: Processes input sequences with self-attention
 - **Decoder**: Processes target sequences with self-attention and cross-attention to encoder outputs
 - Pre-norm transformer architecture with residual connections
+- Separate causal masking for encoder and decoder
 
 ### Model Flow
 1. Input data is embedded using the modular embedding system
-2. Encoder processes the embedded input
+2. Encoder processes the embedded input with optional causal masking
 3. Decoder processes the target sequence while attending to encoder outputs
-4. Final linear layers produce forecasting outputs
+4. Final linear layers produce forecasting and reconstruction outputs
 
 ## Project Structure
 
 ```
-prochain_transformer/
+pro-opt/
 ├── config/                 # Configuration files
 ├── data/                   # Data directory
-│   ├── input/              # Input data
-│   └── output/             # Output data
 ├── docs/                   # Documentation
-├── experiments/            # Experiment results
+│   ├── model_versions.md   # Model version history
+│   ├── todo.md            # Project todo list
+│   └── references/        # Reference materials
+├── experiments/            # Experiment configurations and results
+│   └── training/          # Training experiment configs
+├── logs/                   # Training and execution logs
 ├── notebooks/              # Jupyter notebooks for analysis
-├── prochain_transformer/   # Main source code
+├── proT/                   # Main source code
 │   ├── modules/            # Core model components
 │   │   ├── attention.py    # Attention mechanisms
 │   │   ├── decoder.py      # Decoder implementation
-│   │   ├── embedding.py    # Embedding system
+│   │   ├── embedding.py    # Modular embedding system
 │   │   ├── embedding_layers.py # Base embedding layers
 │   │   ├── encoder.py      # Encoder implementation
 │   │   ├── extra_layers.py # Additional utility layers
 │   │   └── utils.py        # Utility functions
 │   ├── subroutines/        # Task-specific subroutines
+│   ├── baseline/           # Baseline model implementations
+│   ├── simulator/          # Data simulation utilities
+│   ├── utils/              # General utilities
+│   ├── old_/               # Legacy code
 │   ├── callbacks.py        # Training callbacks
 │   ├── cli.py              # Command-line interface
 │   ├── dataloader.py       # Data loading utilities
 │   ├── experiment_control.py # Experiment management
 │   ├── forecaster.py       # Lightning module wrapper
-│   ├── kfold_train.py      # K-fold cross-validation
-│   ├── model.py            # Main model definition
+│   ├── optuna_opt.py       # Hyperparameter optimization
 │   ├── predict.py          # Prediction utilities
-│   └── train.py            # Training utilities
-├── scripts/                # Utility scripts
+│   ├── proT_model.py       # Main model definition
+│   └── trainer.py          # Training utilities
+├── scripts/                # Utility scripts for cluster execution
 └── test/                   # Unit tests
 ```
 
@@ -71,16 +81,16 @@ prochain_transformer/
 
 ### Requirements
 - Python 3.8+
-- PyTorch 1.10+
-- PyTorch Lightning
+- PyTorch 2.2+
+- PyTorch Lightning 2.0+
 - Other dependencies listed in requirements.txt
 
 ### Setting Up the Environment
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/prochain_transformer.git
-cd prochain_transformer
+git clone https://github.com/scipi1/pro-opt.git
+cd pro-opt
 ```
 
 2. Create a virtual environment:
@@ -107,118 +117,157 @@ pip install -r requirements.txt
 
 ### Command Line Interface
 
-The project provides a command-line interface for training and prediction:
+The project provides a command-line interface for training and hyperparameter optimization:
 
 #### Training
 
 ```bash
-python -m prochain_transformer.cli train --exp_id <experiment_id> [--debug] [--cluster] [--resume_checkpoint <checkpoint_path>]
+python -m proT.cli train --exp_id <experiment_id> [options]
 ```
 
 Options:
 - `--exp_id`: Experiment folder containing the config file
 - `--debug`: Enable debug mode (default: False)
 - `--cluster`: Enable cluster mode for distributed training (default: False)
-- `--resume_checkpoint`: Resume training from a checkpoint
+- `--exp_tag`: Tag for model manifest (default: "NA")
+- `--scratch_path`: SCRATCH path for cluster execution
+- `--resume_checkpoint`: Resume training from checkpoint
 - `--plot_pred_check`: Generate prediction plots after training (default: True)
 - `--sweep_mode`: Sweep mode, either 'independent' or 'combination' (default: 'combination')
 
-#### Prediction
+#### Hyperparameter Optimization
 
 ```bash
-python -m prochain_transformer.cli predict --exp_id <experiment_id> --out_id <output_id> [--checkpoint <checkpoint_path>]
+python -m proT.cli paramsopt --exp_id <experiment_id> --mode <mode> [options]
 ```
 
 Options:
-- `--exp_id`: Path to experiment from experiment/training
-- `--out_id`: Path to output from experiment/evaluations
-- `--checkpoint`: Checkpoint path from exp_id path
+- `--exp_id`: Experiment folder containing the config file
+- `--mode`: Select between ['create', 'resume', 'summary']
 - `--cluster`: Enable cluster mode (default: False)
-- `--debug`: Enable debug mode (default: False)
+- `--study_name`: Name for the Optuna study (default: "NA")
+- `--exp_tag`: Tag for model manifest (default: "NA")
+- `--scratch_path`: SCRATCH path for cluster execution
+- `--study_path`: Path to existing study for resuming
 
 ### Configuration
 
 The model is configured using YAML files. A typical configuration includes:
 
 ```yaml
-data:
-  dataset: "your_dataset_name"
-  filename_input: "X_np.npy"
-  filename_target: "Y_np.npy"
-  val_idx: 0  # Index of the value to predict
-
 model:
-  # Embedding configuration
-  ds_embed_enc: {...}
-  ds_embed_dec: {...}
-  comps_embed_enc: "spatiotemporal"
-  comps_embed_dec: "spatiotemporal"
+  model_object: "proT"
   
-  # Attention configuration
-  enc_attention_type: "ScaledDotProduct"
-  dec_self_attention_type: "ScaledDotProduct"
-  dec_cross_attention_type: "ScaledDotProduct"
-  enc_mask_type: "Uniform"
-  dec_self_mask_type: "Uniform"
-  dec_cross_mask_type: "Uniform"
-  n_heads: 4
-  causal_mask: true
+  embed_dim:
+    enc_val_emb_hidden: 50
+    enc_var_emb_hidden: 50
+    enc_pos_emb_hidden: 70
+    enc_time_emb_hidden: 90
+    dec_val_emb_hidden: 130
+    dec_var_emb_hidden: 100
+    dec_pos_emb_hidden: 170
+    dec_time_emb_hidden: 50
   
-  # Architecture configuration
-  e_layers: 3
-  d_layers: 3
-  d_model_enc: 128
-  d_model_dec: 128
-  d_ff: 256
-  d_qk: 32
-  activation: "gelu"
-  norm: "layer"
-  use_final_norm: true
-  out_dim: 1
-  
-  # Dropout configuration
-  dropout_emb: 0.1
-  dropout_data: 0.0
-  dropout_attn_out: 0.1
-  dropout_ff: 0.1
-  enc_dropout_qkv: 0.1
-  enc_attention_dropout: 0.1
-  dec_self_dropout_qkv: 0.1
-  dec_self_attention_dropout: 0.1
-  dec_cross_dropout_qkv: 0.1
-  dec_cross_attention_dropout: 0.1
+  kwargs:
+    comps_embed_enc: "concat"
+    comps_embed_dec: "concat"
+    
+    # Attention configuration
+    enc_attention_type: "ScaledDotProduct"
+    dec_self_attention_type: "ScaledDotProduct"
+    dec_cross_attention_type: "ScaledDotProduct"
+    n_heads: 2
+    causal_mask: False
+    enc_causal_mask: True
+    dec_causal_mask: True
+    
+    # Architecture configuration
+    e_layers: 1
+    d_layers: 1
+    d_ff: 400
+    d_qk: 100
+    activation: "gelu"
+    norm: "batch"
+    use_final_norm: True
+    out_dim: 2
+    
+    # Dropout configuration
+    dropout_emb: 0.2
+    dropout_data: 0.2
+    dropout_attn_out: 0.0
+    dropout_ff: 0.0
 
 training:
-  batch_size: 32
-  max_epochs: 100
+  optimization: 1
+  base_lr: 0.001
+  emb_lr: 0.01
+  batch_size: 50
+  max_epochs: 1000
   loss_fn: "mse"
-  base_lr: 0.0001
-  emb_lr: 0.001
-  emb_start_lr: 0.01
-  optimization: 2
-  switch_epoch: 50
-  switch_step: 50
-  warmup_steps: 1000
+  k_fold: 5
+  seed: 42
+  
+  # Entropy regularization
+  entropy_regularizer: True
+  gamma: 0.05
+
+data:
+  dataset: "your_dataset_name"
+  filename_input: "X.npy"
+  filename_target: "Y.npy"
+  val_idx: 4
+  pos_idx: 3
 ```
+
+## Key Features
+
+### Advanced Embedding System
+- Modular embedding architecture supporting multiple embedding types
+- Separate encoder and decoder embeddings with different configurations
+- Support for categorical variables, continuous values, temporal features, and missing value handling
+
+### Flexible Training Options
+- Multiple optimization strategies (7 different modes)
+- Two-phase training with different optimizers and learning rates
+- Sparse gradient support for embedding layers
+- Entropy regularization for attention interpretability
+
+### Experiment Management
+- YAML-based configuration system
+- Hyperparameter optimization with Optuna
+- Experiment sweeping capabilities
+- Checkpoint management and resuming
+
+### Missing Value Handling
+- Built-in support for missing values in time series
+- Mask-based attention mechanisms
+- Reconstruction capabilities alongside forecasting
 
 ## Examples
 
 ### Basic Training Example
 
-1. Prepare your data in NumPy format (X_np.npy for input, Y_np.npy for target)
-2. Create a configuration file in the experiments/training/<exp_id> directory
+1. Prepare your data in NumPy format (X.npy for input, Y.npy for target)
+2. Create a configuration file in the `experiments/training/<exp_id>` directory
 3. Run the training command:
 
 ```bash
-python -m prochain_transformer.cli train --exp_id your_experiment_id
+python -m proT.cli train --exp_id your_experiment_id
 ```
 
-### Prediction Example
+### Hyperparameter Optimization Example
 
-After training, you can generate predictions using:
+1. Set up your base configuration
+2. Create an Optuna study:
 
 ```bash
-python -m prochain_transformer.cli predict --exp_id your_experiment_id --out_id your_output_id
+python -m proT.cli paramsopt --exp_id your_experiment_id --mode create --study_name my_study
+```
+
+3. Resume optimization:
+
+```bash
+python -m proT.cli paramsopt --exp_id your_experiment_id --mode resume --study_name my_study
 ```
 
 ### Using the Model in Code
@@ -226,9 +275,9 @@ python -m prochain_transformer.cli predict --exp_id your_experiment_id --out_id 
 ```python
 import torch
 import pytorch_lightning as pl
-from prochain_transformer.model import Spacetimeformer
-from prochain_transformer.forecaster import TransformerForecaster
-from prochain_transformer.dataloader import ProcessDataModule
+from proT.proT_model import ProT
+from proT.forecaster import TransformerForecaster
+from proT.dataloader import ProcessDataModule
 
 # Load configuration
 config = {...}  # Your model configuration
@@ -236,11 +285,10 @@ config = {...}  # Your model configuration
 # Create data module
 data_module = ProcessDataModule(
     data_dir="path/to/data",
-    input_file="X_np.npy",
-    target_file="Y_np.npy",
+    input_file="X.npy",
+    target_file="Y.npy",
     batch_size=32,
-    num_workers=4,
-    data_format="float32"
+    num_workers=4
 )
 
 # Create model
@@ -253,6 +301,15 @@ trainer.fit(model, data_module)
 # Make predictions
 trainer.predict(model, data_module)
 ```
+
+## Model Versions
+
+The project maintains version history in `docs/model_versions.md`. Current version is 5.5 with the following key features:
+- Training optimization options
+- Entropy regularization
+- Embedding for given values
+- Separate encoder/decoder causal masks
+- Optuna integration for hyperparameter optimization
 
 ## References
 

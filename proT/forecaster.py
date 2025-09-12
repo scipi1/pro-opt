@@ -155,8 +155,7 @@ class TransformerForecaster(pl.LightningModule):
             
         # MSE loss masks: calculate only on valid values
         if self.show_trg_max_idx is not None:
-            trg_pos_mask = (Y[:,:,self.dec_pos_idx] > self.show_trg_max_idx)
-            mse_mask = torch.logical_not(trg_nan) #torch.logical_and(torch.logical_not(trg_nan)),trg_pos_mask) # B x L
+            mse_mask = torch.logical_not(trg_nan) # B x L
         
         if forecast_output.size(-1) == 2:
             # values and logits
@@ -206,7 +205,7 @@ class TransformerForecaster(pl.LightningModule):
         if self.current_epoch == self.epoch_show_trg:
             self.show_trg_ = True
         
-        if self.current_epoch > self.epoch_show_trg:
+        if self.epoch_show_trg is not None and self.current_epoch > self.epoch_show_trg:
             self._update_target_upper_bound()
         
         # forward step
